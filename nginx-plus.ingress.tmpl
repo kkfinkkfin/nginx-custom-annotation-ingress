@@ -1,3 +1,11 @@
+{{range $server := .Servers}}
+{{if index $.Ingress.Annotations "custom.nginx.org/custom-log-format"}}
+{{with $logformat := index $.Ingress.Annotations "custom.nginx.org/custom-log-format"}}
+log_format {{$server.Name}} {{$logformat}};
+{{end}}
+{{end}}
+{{end}}
+
 # handling custom.nginx.org/conn-limiting and custom.nginx.org/conn-limiting-num 
 {{if index $.Ingress.Annotations "custom.nginx.org/conn-limiting"}}
 limit_conn_zone $binary_remote_addr zone={{$.Ingress.Namespace}}-{{$.Ingress.Name}}-conn:10m;
@@ -9,6 +17,7 @@ limit_conn_zone $binary_remote_addr zone={{$.Ingress.Namespace}}-{{$.Ingress.Nam
 limit_req_zone $binary_remote_addr zone={{$.Ingress.Namespace}}-{{$.Ingress.Name}}-req:10m rate={{if $rate}}{{$rate}}{{end}};
 {{end}}
 
+# handling canary-by-weight
 {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-weight"}}
 split_clients "${remote_addr}${remote_port}AAA" $match {
 {{range $splitclient := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-weight") ","}} 
@@ -17,9 +26,30 @@ split_clients "${remote_addr}${remote_port}AAA" $match {
 }
 {{end}}
 
+# handling canary add header svc
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-add-header-svc"}}
+{{with $value := index $.Ingress.Annotations "custom.nginx.org/canary-add-header-svc"}}
+map $service $addsvcheader{
+    {{range $svc_value := split (index $.Ingress.Annotations "custom.nginx.org/canary-add-header-svc") ","}}
+    {{trim $svc_value}};
+    {{end}}
+}
+{{end}}
+{{end}}
+
+{{if index $.Ingress.Annotations "custom.nginx.org/degrade-svc"}}
+{{with $value := index $.Ingress.Annotations "custom.nginx.org/degrade-svc"}}
+map $path $degradesvc{
+	{{range $degrade_svc := split (index $.Ingress.Annotations "custom.nginx.org/degrade-svc") ","}}
+    {{trim $degrade_svc}};
+    {{end}}
+}
+{{end}}
+{{end}}
+
 {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-cookie"}}
 {{with $canarycookie := index $.Ingress.Annotations "custom.nginx.org/canary-by-cookie"}}
-map $cookie_{{$canarycookie}} $match {
+map $cookie_{{$canarycookie}} $match_cookie {
     {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-cookie-value"}}
     {{range $cookievalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-cookie-value") ","}} 
     {{trim $cookievalue}}; 
@@ -29,13 +59,124 @@ map $cookie_{{$canarycookie}} $match {
 {{end}}
 {{end}}
 
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-header"}}
+{{with $canaryheader := index $.Ingress.Annotations "custom.nginx.org/canary-by-header"}}
+map $http_{{$canaryheader}} $match_header {
+    {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-header-value"}}
+    {{range $headervalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-header-value") ","}} 
+    {{trim $headervalue}}; 
+    {{end}}
+    {{end}}
+}
+{{end}}
+{{end}}
+
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-argument"}}
+{{with $canaryargument := index $.Ingress.Annotations "custom.nginx.org/canary-by-argument"}}
+map $arg_{{$canaryargument}} $match_argument {
+    {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-argument-value"}}
+    {{range $argumentvalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-argument-value") ","}} 
+    {{trim $argumentvalue}}; 
+    {{end}}
+    {{end}}
+}
+{{end}}
+{{end}}
+
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-variable"}}
+{{with $canaryvariable := index $.Ingress.Annotations "custom.nginx.org/canary-by-variable"}}
+map {{$canaryvariable}} $match_variable {
+    {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-variable-value"}}
+    {{range $variablevalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-variable-value") ","}} 
+    {{trim $variablevalue}}; 
+    {{end}}
+    {{end}}
+}
+{{end}}
+{{end}}
+
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-ipset"}}
+geo $binary_remote_addr $match_ipset {
+    {{range $ipsetvalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-ipset") ","}} 
+    {{trim $ipsetvalue}}; 
+    {{end}}
+}
+{{end}}
+
+# single condition
+# single condition for each : cookie , header, argument, variable, ip set
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-single"}}
+
+# single condition: cookie
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-cookie"}}
+map $match_cookie $match_multicondition {
+    {{range $multiconditionvalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-multicondition") ","}} 
+    {{trim $multiconditionvalue}}; 
+    {{end}}
+}
+{{end}}
+
+
+# single condition: header
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-header"}}
+map $match_header $match_multicondition {
+    {{range $multiconditionvalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-multicondition") ","}} 
+    {{trim $multiconditionvalue}}; 
+    {{end}}
+}
+{{end}}
+
+# single condition: argument
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-argument"}}
+map $match_argument $match_multicondition {
+    {{range $multiconditionvalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-multicondition") ","}} 
+    {{trim $multiconditionvalue}}; 
+    {{end}}
+}
+{{end}}
+
+# single condition: variable
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-variable"}}
+map $match_variable $match_multicondition {
+    {{range $multiconditionvalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-multicondition") ","}} 
+    {{trim $multiconditionvalue}}; 
+    {{end}}
+}
+{{end}}
+
+# single condition: ipset
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-ipset"}}
+map $match_ipset $match_multicondition {
+    {{range $multiconditionvalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-multicondition") ","}} 
+    {{trim $multiconditionvalue}}; 
+    {{end}}
+}
+{{end}}
+
+{{end}}
+
+# multi condition 
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-multi"}}
+
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-header"}}
+{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-cookie"}}
+map $match_header$match_cookie $match_multicondition {
+    {{range $multiconditionvalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-multicondition") ","}} 
+    {{trim $multiconditionvalue}}; 
+    {{end}}
+}
+{{end}}
+{{end}}
+
+{{end}}
+
 # configuration for {{.Ingress.Namespace}}/{{.Ingress.Name}}
 {{range $upstream := .Upstreams}}
 upstream {{$upstream.Name}} {
 	zone {{$upstream.Name}} {{if ne $upstream.UpstreamZoneSize "0"}}{{$upstream.UpstreamZoneSize}}{{else}}512k{{end}};
 	{{if $upstream.LBMethod }}{{$upstream.LBMethod}};{{end}}
 	{{range $server := $upstream.UpstreamServers}}
-	server {{$server.Address}} max_fails={{$server.MaxFails}} fail_timeout={{$server.FailTimeout}} max_conns={{$server.MaxConns}}
+	server {{$server.Address}}:{{$server.Port}} max_fails={{$server.MaxFails}} fail_timeout={{$server.FailTimeout}} max_conns={{$server.MaxConns}}
 	    {{- if $server.SlowStart}} slow_start={{$server.SlowStart}}{{end}}{{if $server.Resolve}} resolve{{end}};{{end}}
 	{{if $upstream.StickyCookie}}
 	sticky cookie {{$upstream.StickyCookie}};
@@ -53,15 +194,29 @@ upstream {{$upstream.Name}} {
 server {
 	{{if $server.SpiffeCerts}}
 	listen 443 ssl;
-	{{if not $server.DisableIPV6}}listen [::]:443 ssl;{{end}}
 	ssl_certificate /etc/nginx/secrets/spiffe_cert.pem;
 	ssl_certificate_key /etc/nginx/secrets/spiffe_key.pem;
 	{{else}}
 	{{if not $server.GRPCOnly}}
 	{{range $port := $server.Ports}}
 	listen {{$port}}{{if $server.ProxyProtocol}} proxy_protocol{{end}};
-	{{if not $server.DisableIPV6}}listen [::]:{{$port}}{{if $server.ProxyProtocol}} proxy_protocol{{end}};{{end}}
 	{{- end}}
+	{{end}}
+	
+	{{if index $.Ingress.Annotations "custom.nginx.org/custom-access-log-off"}}
+	{{with $accesslog := index $.Ingress.Annotations "custom.nginx.org/custom-access-log-off"}}
+	access_log off;
+	{{end}}
+	{{else}}
+	{{if index $.Ingress.Annotations "custom.nginx.org/custom-log-format"}}
+	access_log /var/log/nginx/{{$server.Name}}-access.log {{$server.Name}};
+	{{end}}
+	{{end}}
+	
+	{{if index $.Ingress.Annotations "custom.nginx.org/custom-error-log"}}
+	{{with $errorflag := index $.Ingress.Annotations "custom.nginx.org/custom-error-log"}}
+	error_log /var/log/nginx/{{$server.Name}}-error.log {{$errorflag}};
+	{{end}}
 	{{end}}
 
 	{{if $server.SSL}}
@@ -72,7 +227,6 @@ server {
 	{{else}}
 	{{- range $port := $server.SSLPorts}}
 	listen {{$port}} ssl{{if $server.HTTP2}} http2{{end}}{{if $server.ProxyProtocol}} proxy_protocol{{end}};
-	{{if not $server.DisableIPV6}}listen [::]:{{$port}} ssl{{if $server.HTTP2}} http2{{end}}{{if $server.ProxyProtocol}} proxy_protocol{{end}};{{end}}
 	{{- end}}
 	{{end}}
 	{{if $server.SSLRejectHandshake}}
@@ -107,29 +261,7 @@ server {
 	{{range $AppProtectLogConf := $server.AppProtectLogConfs}}app_protect_security_log {{$AppProtectLogConf}};
 	{{end}}
 	{{- end}}
-
-	{{- if $server.AppProtectDosEnable}}
-	app_protect_dos_enable {{$server.AppProtectDosEnable}};
-	{{if $server.AppProtectDosPolicyFile}}app_protect_dos_policy_file {{$server.AppProtectDosPolicyFile}};{{end}}
-	{{- if $server.AppProtectDosLogEnable}}
-	app_protect_dos_security_log_enable on;
-	{{if $server.AppProtectDosLogConfFile}}app_protect_dos_security_log {{$server.AppProtectDosLogConfFile}};{{end}}
-	{{- end}}
-	{{- if $server.AppProtectDosAccessLogDst}}
-	set $loggable '0';
-	# app-protect-dos module will set it to '1'  if a request doesn't pass the rate limit
-	access_log {{ .AppProtectDosAccessLogDst }} log_dos if=$loggable;
-	{{- end}}
-	{{- if $server.AppProtectDosMonitorURI}}
-		{{- if or $server.AppProtectDosMonitorProtocol $server.AppProtectDosMonitorTimeout}}
-	app_protect_dos_monitor uri={{$server.AppProtectDosMonitorURI}}{{if $server.AppProtectDosMonitorProtocol}} protocol={{$server.AppProtectDosMonitorProtocol}}{{end}}{{if $server.AppProtectDosMonitorTimeout}} timeout={{$server.AppProtectDosMonitorTimeout}}{{end}};
-		{{- else}}
-	app_protect_dos_monitor "{{$server.AppProtectDosMonitorURI}}";
-		{{- end}}
-	{{- end}}
-	{{if $server.AppProtectDosName}}app_protect_dos_name "{{$server.AppProtectDosName}}";{{end}}
-	{{- end}}
-
+	
 	{{if not $server.GRPCOnly}}
 	{{range $proxyHideHeader := $server.ProxyHideHeaders}}
 	proxy_hide_header {{$proxyHideHeader}};{{end}}
@@ -166,11 +298,6 @@ server {
 		return 301 https://$host$request_uri;
 	}
 	{{- end}}
-
-	{{- with $server.BasicAuth }}
-    auth_basic {{ printf "%q" .Realm }};
-    auth_basic_user_file {{ .Secret }};
-	{{- end }}
 
 	{{with $jwt := $server.JWTAuth}}
 	auth_jwt_key_file {{$jwt.Key}};
@@ -210,6 +337,8 @@ server {
 	{{range $location := $server.Locations}}
 	location {{$location.Path}} {
 		set $service "{{$location.ServiceName}}";
+		set $path "{{$location.Path}}";
+		status_zone {{$location.Path}}_{{$location.ServiceName}};
 		{{with $location.MinionIngress}}
 		# location for minion {{$location.MinionIngress.Namespace}}/{{$location.MinionIngress.Name}}
 		set $resource_name "{{$location.MinionIngress.Name}}";
@@ -224,13 +353,28 @@ server {
             {{end}} 
 	    
 	    # handling custom.nginx.org/custom.nginx.org/set-header
+	    {{if index $.Ingress.Annotations "custom.nginx.org/set-header"}}
             {{range $setheader := split (index $.Ingress.Annotations "custom.nginx.org/set-header") ","}} 
             proxy_set_header {{trim $setheader}}; 
             {{end}}
+	    {{end}} 
 
             # handling custom.nginx.org/custom.nginx.org/add-header
+	    {{if index $.Ingress.Annotations "custom.nginx.org/add-header"}}
             {{range $addheader := split (index $.Ingress.Annotations "custom.nginx.org/add-header") ","}} 
             add_header {{trim $addheader}} always; 
+            {{end}}
+	    {{end}} 
+	    
+	    # handling custom.nginx.org/canary-add-header
+	    {{if index $.Ingress.Annotations "custom.nginx.org/canary-add-header-svc"}}
+            if ( $addsvcheader = "1" ){
+	    {{if index $.Ingress.Annotations "custom.nginx.org/canary-add-header"}}
+               {{range $addcanaryheader := split (index $.Ingress.Annotations "custom.nginx.org/canary-add-header") ","}} 
+                add_header {{trim $addcanaryheader}} always; 
+               {{end}}
+	    {{end}} 
+            }
             {{end}}
 	    
 	    # handling custom.nginx.org/conn-limiting-num
@@ -250,6 +394,10 @@ server {
             limit_req_status 503;
             {{end}} 
             {{end}}
+	    
+	    {{if index $.Ingress.Annotations "custom.nginx.org/degrade-svc"}}
+	    error_page 503 @{{$location.ServiceName}};
+	    {{end}} 
 
 		{{if $location.GRPC}}
 		{{if not $server.GRPCOnly}}
@@ -277,11 +425,6 @@ server {
 		auth_jwt_key_file {{$jwt.Key}};
 		auth_jwt "{{.Realm}}"{{if $jwt.Token}} token={{$jwt.Token}}{{end}};
 		{{end}}
-
-		{{- with $location.BasicAuth }}
-		auth_basic {{ printf "%q" .Realm }};
-		auth_basic_user_file {{ .Secret }};
-		{{- end }}
 
 		grpc_connect_timeout {{$location.ProxyConnectTimeout}};
 		grpc_read_timeout {{$location.ProxyReadTimeout}};
@@ -331,11 +474,6 @@ server {
 		error_page 401 {{$jwt.RedirectLocationName}};
 		{{end}}
 		{{end}}
-
-		{{- with $location.BasicAuth }}
-		auth_basic {{ printf "%q" .Realm }};
-		auth_basic_user_file {{ .Secret }};
-		{{- end }}
 
 		proxy_connect_timeout {{$location.ProxyConnectTimeout}};
 		proxy_read_timeout {{$location.ProxyReadTimeout}};
@@ -403,8 +541,53 @@ server {
 	location @grpcerror503 { default_type application/grpc; return 503 "\n"; }
 	location @grpcerror504 { default_type application/grpc; return 504 "\n"; }
 	{{end}}
+	
+        ## degrade service 
+	{{if index $.Ingress.Annotations "custom.nginx.org/degrade-svc"}}
+        {{range $location := $server.Locations}}
+        location @{{$location.ServiceName}} {
+            if ( $degradesvc = "1" ){
+                return 404;
+            }
+            if ( $degradesvc = "0" ){
+                set $service "{{$location.ServiceName}}";
+        		
+        	    # handling custom.nginx.org/canary-add-header
+        	    {{if index $.Ingress.Annotations "custom.nginx.org/canary-add-header-svc"}}
+                if ( $addsvcheader = "1" ){
+        	    {{if index $.Ingress.Annotations "custom.nginx.org/canary-add-header"}}
+                {{range $addcanaryheader := split (index $.Ingress.Annotations "custom.nginx.org/        canary-add-header") ","}} 
+                    add_header {{trim $addcanaryheader}} always; 
+                {{end}}
+        	    {{end}} 
+                }
+                {{end}}
+        
+        		{{if $location.SSL}}
+        		proxy_pass https://{{$location.Upstream.Name}}{{$location.Rewrite}};
+        		{{else}}
+        		proxy_pass http://{{$location.Upstream.Name}}{{$location.Rewrite}};
+        		{{end}}
+        
+        	}
+        }
+        {{end}}   
+	{{end}} 
+	
+	# handling IPset Block request
+	location /block {
+            return 403 "your IP is not allowed！";
+        }
+	
 	# handling custom.nginx.org/canary-by-path
-        {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-path"}}
+        {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-multicondition"}}
+        {{with $canarypath := index $.Ingress.Annotations "custom.nginx.org/canary-by-path"}}
+        location {{if $canarypath}}{{$canarypath}}{{end}} {
+            rewrite ^ $match_multicondition last;
+         }
+        {{end}}
+	{{end}}
+	{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-weight"}}
         {{with $canarypath := index $.Ingress.Annotations "custom.nginx.org/canary-by-path"}}
         location {{if $canarypath}}{{$canarypath}}{{end}} {
             rewrite ^ $match last;
