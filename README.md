@@ -11,36 +11,18 @@ Custom annotations enable you to quickly extend the Ingress resource to support 
 
 ### [rewrite]
 * `custom.nginx.org/rewrite-with-host: "https://www.baidu.com"` - configures the URL with hostname to rewrite
-### Step 1 - Customizs the Template
-```nginx-plus-ingress.tmpl
-...
-server {
-  ...
-  location {
-    ...
-    # handling custom.nginx.org/rewrite-with-host  
-    {{if index $.Ingress.Annotations "custom.nginx.org/rewrite-with-host"}}
-    {{with $rewritehost := index $.Ingress.Annotations "custom.nginx.org/rewrite-with-host"}}
-    rewrite ^{{$location.Path}}/?(.*) {{$rewritehost}} break;
-    {{end}} 
-    {{end}} 
-    ...
-  }
-  ...
-}
-```
 
-### Step 2 - Use Custom Annotations in an Ingress Resource
+### Ingress Example
 ```ingress
-apiVersion: networking.k8s.io/v1
+apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: cafe-ingress
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "yunke"
     custom.nginx.org/rewrite-with-host: "https://www.baidu.com"
 spec:
-  ingressClassName: nginx
+  # ingressClassName: nginx # use only with k8s version >= 1.18.0
   tls:
   - hosts:
     - cafe.example.com
@@ -50,12 +32,13 @@ spec:
     http:
       paths:
       - path: /tea
-        pathType: Prefix
         backend:
-          service:
-            name: tea-svc
-            port:
-              number: 80
+          serviceName: tea-svc
+          servicePort: 80
+      - path: /coffee
+        backend:
+          serviceName: coffee-svc
+          servicePort: 80
 ```
 
 ## 2 - Proxy Set Header
@@ -63,34 +46,16 @@ spec:
 ### [proxy_set_header]
 * `custom.nginx.org/set-header: "Connection close, X-Real-IP $remote_addr"`
 
-### Step 1 - Customizs the Template
-```nginx-plus-ingress.tmpl
-...
-server {
-  ...
-  location {
-    ...
-    # handling custom.nginx.org/custom.nginx.org/set-header
-    {{range $setheader := split (index $.Ingress.Annotations "custom.nginx.org/set-header") ","}} 
-    proxy_set_header {{trim $setheader}}; 
-    {{end}}
-    ...
-  }
-  ...
-}
-```
-
-### Step 2 - Use Custom Annotations in an Ingress Resource
+### Ingress Example
 ```ingress
-apiVersion: networking.k8s.io/v1
+apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: cafe-ingress
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "yunke"
     custom.nginx.org/set-header: "Connection close, X-Real-IP $remote_addr"
 spec:
-  ingressClassName: nginx
   tls:
   - hosts:
     - cafe.example.com
@@ -100,12 +65,13 @@ spec:
     http:
       paths:
       - path: /tea
-        pathType: Prefix
         backend:
-          service:
-            name: tea-svc
-            port:
-              number: 80
+          serviceName: tea-svc
+          servicePort: 80
+      - path: /coffee
+        backend:
+          serviceName: coffee-svc
+          servicePort: 80
 ```
 
 ## 3 - Response Add Header
@@ -113,34 +79,16 @@ spec:
 ### [add_header]
 * `custom.nginx.org/add-header: "Cache-Control private, test 111"`
 
-### Step 1 - Customizs the Template
-```nginx-plus-ingress.tmpl
-...
-server {
-  ...
-  location {
-    ...
-    # handling custom.nginx.org/custom.nginx.org/add-header
-    {{range $addheader := split (index $.Ingress.Annotations "custom.nginx.org/add-header") ","}} 
-    add_header {{trim $addheader}} always; 
-    {{end}}
-    ...
-  }
-  ...
-}
-```
-
-### Step 2 - Use Custom Annotations in an Ingress Resource
+### Ingress Example
 ```ingress
-apiVersion: networking.k8s.io/v1
+apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: cafe-ingress
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "yunke"
     custom.nginx.org/add-header: "Cache-Control private, test 111"
 spec:
-  ingressClassName: nginx
   tls:
   - hosts:
     - cafe.example.com
@@ -150,12 +98,13 @@ spec:
     http:
       paths:
       - path: /tea
-        pathType: Prefix
         backend:
-          service:
-            name: tea-svc
-            port:
-              number: 80
+          serviceName: tea-svc
+          servicePort: 80
+      - path: /coffee
+        backend:
+          serviceName: coffee-svc
+          servicePort: 80
 ```
 
 ## 4 - Limit Connection
@@ -164,58 +113,31 @@ spec:
 * `custom.nginx.org/conn-limiting: "on"`
 * `custom.nginx.org/conn-limiting-num: "1000"`
 
-### Step 1 - Customizs the Template
-```nginx-plus-ingress.tmpl
-# handling custom.nginx.org/conn-limiting and custom.nginx.org/conn-limiting-num 
-{{if index $.Ingress.Annotations "custom.nginx.org/conn-limiting"}}
-limit_conn_zone $binary_remote_addr zone={{$.Ingress.Namespace}}-{{$.Ingress.Name}}-conn:10m;
-{{end}}
-...
-server {
-  ...
-  location {
-    ...
-    # handling custom.nginx.org/conn-limiting-num
-    {{if index $.Ingress.Annotations "custom.nginx.org/conn-limiting"}}
-    {{with $conn := index $.Ingress.Annotations "custom.nginx.org/conn-limiting-num"}}
-    limit_conn {{$.Ingress.Namespace}}-{{$.Ingress.Name}}-conn {{$conn}};
-    limit_conn_log_level error;
-    limit_conn_status 503;
-    {{end}} 
-    {{end}}
-    ...
-  }
-  ...
-}
-```
-
-### Step 2 - Use Custom Annotations in an Ingress Resource
+### Ingress Example
 ```ingress
-apiVersion: networking.k8s.io/v1
+apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: cafe-ingress
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "yunke"
+    custom.nginx.org/rate-limiting: "on"
     custom.nginx.org/conn-limiting: "on"
     custom.nginx.org/conn-limiting-num: "1000"
+  name: cafe-ingress
+  namespace: default
 spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - cafe.example.com
-    secretName: cafe-secret
   rules:
   - host: cafe.example.com
     http:
       paths:
-      - path: /tea
-        pathType: Prefix
-        backend:
-          service:
-            name: tea-svc
-            port:
-              number: 80
+      - backend:
+          serviceName: tea-svc
+          servicePort: 80
+        path: /tea
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /coffee
 ```
 
 ## 5 - Limit Request
@@ -225,212 +147,167 @@ spec:
 * `custom.nginx.org/rate-limiting-rate: "500r/s"`
 * `custom.nginx.org/rate-limiting-burst: "3"`
 
-### Step 1 - Customizs the Template
-```nginx-plus-ingress.tmpl
-# handling custom.nginx.org/rate-limiting and custom.nginx.org/rate-limiting-rate 
-{{if index $.Ingress.Annotations "custom.nginx.org/rate-limiting"}}
-{{$rate := index $.Ingress.Annotations "custom.nginx.org/rate-limiting-rate"}}
-limit_req_zone $binary_remote_addr zone={{$.Ingress.Namespace}}-{{$.Ingress.Name}}-req:10m rate={{if $rate}}{{$rate}}{{end}};
-{{end}}
-...
-server {
-  ...
-  location {
-    ...
-    # handling custom.nginx.org/rate-limiting and custom.nginx.org/rate-limiting-burst
-    {{if index $.Ingress.Annotations "custom.nginx.org/rate-limiting"}}
-    {{with $burst := index $.Ingress.Annotations "custom.nginx.org/rate-limiting-burst"}}
-    limit_req zone={{$.Ingress.Namespace}}-{{$.Ingress.Name}}-req {{if $burst}}burst={{$burst}}{{else}}nodelay{{end}};
-    limit_req_log_level error;
-    limit_req_status 503;
-    {{end}} 
-    {{end}}
-    ...
-  }
-  ...
-}
-```
-
-### Step 2 - Use Custom Annotations in an Ingress Resource
+### Ingress Example
 ```ingress
-apiVersion: networking.k8s.io/v1
+apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: cafe-ingress
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "yunke"
     custom.nginx.org/rate-limiting: "on"
     custom.nginx.org/rate-limiting-rate: "500r/s"
     custom.nginx.org/rate-limiting-burst: "3"
+  name: cafe-ingress
+  namespace: default
 spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - cafe.example.com
-    secretName: cafe-secret
   rules:
   - host: cafe.example.com
     http:
       paths:
-      - path: /tea
-        pathType: Prefix
-        backend:
-          service:
-            name: tea-svc
-            port:
-              number: 80
+      - backend:
+          serviceName: tea-svc
+          servicePort: 80
+        path: /tea
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /coffee
 ```
 
 ## 6 - Weight Canary
 
 ### [weight]
-* `custom.nginx.org/canary: "true"`
-* `custom.nginx.org/canary-by-path: "/tea"`
+* `custom.nginx.org/canary-by-path: "/"`
 * `custom.nginx.org/canary-by-weight: "70% /match0, 30% /match1"`
-* `nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea;serviceName=tea-v2-svc rewrite=/tea"`
+* `nginx.org/rewrites: nginx.org/rewrites: "serviceName=tea-svc rewrite=$request_uri;serviceName=coffee-svc rewrite=$request_uri"`
 
-### Step 1 - Customizs the Template
-```nginx-plus-ingress.tmpl
-{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-weight"}}
-split_clients "${remote_addr}${remote_port}AAA" $match {
-{{range $splitclient := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-weight") ","}} 
-    {{trim $splitclient}}; 
-{{end}}
-}
-{{end}}
-...
-server {
-  ...
-  location {
-    ...
-  }
-  ...
-  # handling custom.nginx.org/canary-by-path
-  {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-path"}}
-  {{with $canarypath := index $.Ingress.Annotations "custom.nginx.org/canary-by-path"}}
-  location {{if $canarypath}}{{$canarypath}}{{end}} {
-      rewrite ^ $match last;
-   }
-  {{end}}
-  {{end}}
-}
-```
-
-### Step 2 - Use Custom Annotations in an Ingress Resource
+### Ingress Example
 ```ingress
-apiVersion: networking.k8s.io/v1
+apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: cafe-ingress
   annotations:
-    custom.nginx.org/canary: "true"
-    custom.nginx.org/canary-by-path: "/tea"
+    kubernetes.io/ingress.class: "yunke"
+    custom.nginx.org/canary-by-path: "/"
     custom.nginx.org/canary-by-weight: "70% /match0, 30% /match1"
-    nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea;serviceName=tea-v2-svc rewrite=/tea"
+    nginx.org/rewrites: "serviceName=tea-svc rewrite=$request_uri;serviceName=coffee-svc rewrite=$request_uri"
+  name: cafe-ingress
+  namespace: default
 spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - cafe.example.com
-    secretName: cafe-secret
   rules:
   - host: cafe.example.com
     http:
       paths:
-      - path: /match0
-        pathType: Prefix
-        backend:
-          service:
-            name: tea-svc
-            port:
-              number: 80
-      - path: /match1
-        pathType: Prefix
-        backend:
-          service:
-            name: tea-v2-svc
-            port:
-              number: 80
+      - backend:
+          serviceName: tea-svc
+          servicePort: 80
+        path: /match1
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /match0
 ```
 
-## 7 - Cookie Canary
+## 7 - Condition Route
 
-Cookie Canary和 Weight Canary (按比例灰度) 不能同时使用。
+Condition Route（条件路由） 和 Weight Canary (按比例灰度) 不能同时使用。
+条件路由支持有：Header, Cookie，Argument, Variable，IPSET（黑白名单）可以做1到多个条件随意组合，每个条件里面可以是1到多组值。支持逻辑与或非组合。
+
+### 单个条件必须携带此参数标记
+* `custom.nginx.org/canary-single: "true"`
+* `custom.nginx.org/canary-by-multicondition: "1 /match1, 0 /match0, default /match0"`
+`custom.nginx.org/canary-by-multicondition` 值根据实际的条件数量进行填写
+
+### 1个以上的条件必须携带此参数标记
+* `custom.nginx.org/canary-multi: "true"`
+* `custom.nginx.org/canary-by-multicondition: "11 /match11, 10 /match10, 01 /match01, 00 /match00"`
+`custom.nginx.org/canary-by-multicondition` 值根据实际的条件数量进行填写
+1 - 表示满足条件
+0 - 表示不满足条件
+
 
 ### [cookie]
-* `custom.nginx.org/canary: "true"`
-* `custom.nginx.org/canary-by-path: "/tea"`
+* `custom.nginx.org/canary-by-path: "/"`
 * `custom.nginx.org/canary-by-cookie: "version"`
 * `custom.nginx.org/canary-by-cookie-value: "v1 /match0, default /match1"`
-* `nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea;serviceName=tea-v2-svc rewrite=/tea"`
+* `custom.nginx.org/canary-by-multicondition: "1 /match1, 0 /match0, default /match0"`
+* `nginx.org/rewrites: "serviceName=tea-svc rewrite=$request_uri;serviceName=coffee-svc rewrite=$request_uri"`
 
-### Step 1 - Customizs the Template
-```nginx-plus-ingress.tmpl
-{{if index $.Ingress.Annotations "custom.nginx.org/canary-by-cookie"}}
-{{with $canarycookie := index $.Ingress.Annotations "custom.nginx.org/canary-by-cookie"}}
-map $cookie_{{$canarycookie}} $match {
-    {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-cookie-value"}}
-    {{range $cookievalue := split (index $.Ingress.Annotations "custom.nginx.org/canary-by-cookie-value") ","}} 
-    {{trim $cookievalue}}; 
-    {{end}}
-    {{end}}
-}
-{{end}}
-{{end}}
-...
-server {
-  ...
-  location {
-    ...
-  }
-  ...
-  # handling custom.nginx.org/canary-by-path
-  {{if index $.Ingress.Annotations "custom.nginx.org/canary-by-path"}}
-  {{with $canarypath := index $.Ingress.Annotations "custom.nginx.org/canary-by-path"}}
-  location {{if $canarypath}}{{$canarypath}}{{end}} {
-      rewrite ^ $match last;
-   }
-  {{end}}
-  {{end}}
-}
-```
-
-### Step 2 - Use Custom Annotations in an Ingress Resource
+### Single Condition Ingress Example 
 ```ingress
-apiVersion: networking.k8s.io/v1
+apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: cafe-ingress
   annotations:
-    custom.nginx.org/canary: "true"
-    custom.nginx.org/canary-by-path: "/tea"
+    kubernetes.io/ingress.class: "yunke"
+    custom.nginx.org/canary-single: "true"
+    custom.nginx.org/canary-by-path: "/"
     custom.nginx.org/canary-by-cookie: "version"
-    custom.nginx.org/canary-by-cookie-value: "v1 /match0, default /match1"
-    nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea;serviceName=tea-v2-svc rewrite=/tea"
+    custom.nginx.org/canary-by-cookie-value: "v1 1, default 0"
+    custom.nginx.org/canary-by-multicondition: "1 /match1, 0 /match0, default /match0"
+    nginx.org/rewrites: "serviceName=tea-svc rewrite=$request_uri;serviceName=coffee-svc rewrite=$request_uri"
+  name: cafe-ingress
+  namespace: default
 spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - cafe.example.com
-    secretName: cafe-secret
   rules:
   - host: cafe.example.com
     http:
       paths:
-      - path: /match0
-        pathType: Prefix
-        backend:
-          service:
-            name: tea-svc
-            port:
-              number: 80
-      - path: /match1
-        pathType: Prefix
-        backend:
-          service:
-            name: tea-v2-svc
-            port:
-              number: 80
+      - backend:
+          serviceName: tea-svc
+          servicePort: 80
+        path: /match1
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /match0
+  tls:
+  - hosts:
+    - cafe.example.com
+    secretName: cafe-secret
+```
+
+### Multi Condition Ingress Example 
+```ingress
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    custom.nginx.org/canary-multi: "true"
+    custom.nginx.org/canary-by-path: "/"
+    custom.nginx.org/canary-by-cookie: "version"
+    custom.nginx.org/canary-by-cookie-value: "v1 1, default 0"
+    custom.nginx.org/canary-by-header: "header"
+    custom.nginx.org/canary-by-header-value: "foo 1, default 0"
+    custom.nginx.org/canary-by-multicondition: "11 /match11, 10 /match10, 01 /match01, 00 /match00"
+    nginx.org/rewrites: "serviceName=tea-svc rewrite=$request_uri;serviceName=coffee-svc rewrite=$request_uri"
+  name: cafe-ingress
+  namespace: default
+spec:
+  rules:
+  - host: cafe.example.com
+    http:
+      paths:
+      - backend:
+          serviceName: tea-svc
+          servicePort: 80
+        path: /match11
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /match00
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /match10
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /match01
+  tls:
+  - hosts:
+    - cafe.example.com
+    secretName: cafe-secret
 ```
 
 ## 8 - Others Canary
@@ -440,38 +317,170 @@ Header, Argument, Variable Canary 同 Cookie Canary
 * `custom.nginx.org/canary-by-path: "/tea"`
 * `custom.nginx.org/canary-by-header: "version"`
 * `custom.nginx.org/canary-by-header-value: "v1 /match0, default /match1"`
-* `nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea;serviceName=tea-v2-svc rewrite=/tea"`
+* `nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea$request_uri;serviceName=tea-v2-svc rewrite=/tea$request_uri"`
 
 ### Argument
 * `custom.nginx.org/canary-by-path: "/tea"`
 * `custom.nginx.org/canary-by-argument: "version"`
 * `custom.nginx.org/canary-by-argument-value: "v1 /match0, default /match1"`
-* `nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea;serviceName=tea-v2-svc rewrite=/tea"`
+* `nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea$request_uri;serviceName=tea-v2-svc rewrite=/tea$request_uri"`
 
 ### Variable
 * `custom.nginx.org/canary-by-path: "/tea"`
 * `custom.nginx.org/canary-by-variable: "version"`
 * `custom.nginx.org/canary-by-variable-value: "v1 /match0, default /match1"`
-* `nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea;serviceName=tea-v2-svc rewrite=/tea"`
+* `nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea$request_uri;serviceName=tea-v2-svc rewrite=/tea$request_uri"`
 
 
-## 9 - Multi Condition Canary
-待补充
+### IP_SET
+* `custom.nginx.org/canary-by-path: "/tea"`
+* `custom.nginx.org/canary-by-ipset: "172.16.240.0/24 1, default 0"`
+* `nginx.org/rewrites: "serviceName=tea-svc rewrite=/tea$request_uri;serviceName=tea-v2-svc rewrite=/tea$request_uri"`
+
+
+## 9 - Canary Add Header 灰度流量标记
+* `custom.nginx.org/canary-add-header-svc: "tea-svc 1, coffee-svc 0"`
+* `custom.nginx.org/canary-add-header: "Connection close, X-Real-IP $remote_addr"`
+`custom.nginx.org/canary-add-header-svc` 值里面声明Service Name，对应值表示：
+1 - 添加
+0 - 不添加
+一般与灰度比例或者条件路由配合使用
+
+### Ingress Example
+```Ingress
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    custom.nginx.org/canary-multi: "true"
+    custom.nginx.org/canary-by-path: "/"
+    custom.nginx.org/canary-by-cookie: "version"
+    custom.nginx.org/canary-by-cookie-value: "v1 1, default 0"
+    custom.nginx.org/canary-by-header: "header"
+    custom.nginx.org/canary-by-header-value: "foo 1, default 0"
+    custom.nginx.org/canary-by-multicondition: "11 /match11, 10 /match10, 01 /match01, 00 /match00"
+    custom.nginx.org/canary-add-header-svc: "tea-svc 1, coffee-svc 0"
+    custom.nginx.org/canary-add-header: "Connection close, X-Real-IP $remote_addr"
+    nginx.org/rewrites: "serviceName=tea-svc rewrite=$request_uri;serviceName=coffee-svc rewrite=$request_uri"
+  name: cafe-ingress
+  namespace: default
+spec:
+  rules:
+  - host: cafe.example.com
+    http:
+      paths:
+      - backend:
+          serviceName: tea-svc
+          servicePort: 80
+        path: /match11
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /match00
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /match10
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /match01
+  tls:
+  - hosts:
+    - cafe.example.com
+    secretName: cafe-secret
 ```
-custom.nginx.org/canary-by-condition: |
-  {
-    "condition": [
-      {"cookie": "version", "value": "v1", "opt": "~*"},
-      {"header": "testheader", "value": "testheader", "opt": "="},
-      {"argument": "john", "value": "far", "opt": "~*"},
-      {"variable": "$request_method", "value": "POST", "opt": "!~*"}
-    ],
-    "pass": "tea"  
-  }
+
+## 10 - Service Degrade 服务降级
+* `custom.nginx.org/degrade-svc: "/nonecore 1, /core 0"`
+`custom.nginx.org/degrade-svc`值里面声明api对应的值表示：
+1 - 降级
+0 - 正常转发
+一般与限流限速（limit connection, limit request）配合使用
+
+### Ingress Example
+```Ingress
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    custom.nginx.org/rate-limiting: "on"
+    custom.nginx.org/rate-limiting-rate: "500r/s"
+    custom.nginx.org/rate-limiting-burst: "3"
+    custom.nginx.org/degrade-svc: "/nonecore 1, /core 0"
+  name: cafe-ingress
+  namespace: default
+spec:
+  rules:
+  - host: cafe.example.com
+    http:
+      paths:
+      - backend:
+          serviceName: tea-svc
+          servicePort: 80
+        path: /nonecore
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /core
 ```
-### 运算符解析：
-- 使用"="和"!="运算符将变量与字符串进行比较
-- "~"区分大小写匹配
-- "~*"不区分大小写匹配
-- "!~"区分大小写不匹配
-- "!~*"不区分大小写不匹配
+
+## 11 - Custome Access Log and Error Log 租户自定义访问日志和错误日志
+* `custom.nginx.org/custom-log-format: "$remote_addr - $remote_user [$time_local] \"$request\""`
+* `custom.nginx.org/custom-access-log-off: "true"` #默认不配置即开启
+* `custom.nginx.org/custom-error-log: "debug|info|notice|warn|error|crit|alert|emerg"` # 默认不配置即没有
+
+说明：
+1. 如果配置`custom.nginx.org/custom-log-format`即表示启用access log
+2. 如果需要关闭access log则不需要配置`custom.nginx.org/custom-log-format`，配置`custom.nginx.org/custom-access-log-off: "true"`
+3. error log默认关闭，如需启用配置`custom.nginx.org/custom-error-log: "info"`
+
+### Ingress Example： access log and error log ON
+```Ingress
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    custom.nginx.org/custom-log-format: "$remote_addr - $remote_user [$time_local] \"$request\""
+    custom.nginx.org/custom-error-log: "info"
+  name: cafe-ingress
+  namespace: default
+spec:
+  rules:
+  - host: cafe.example.com
+    http:
+      paths:
+      - backend:
+          serviceName: tea-svc
+          servicePort: 80
+        path: /tea
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /coffee
+```
+
+### Ingress Example: access log and error log OFF
+```Ingress
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    custom.nginx.org/custom-access-log-off: "true"
+  name: cafe-ingress
+  namespace: default
+spec:
+  rules:
+  - host: cafe.example.com
+    http:
+      paths:
+      - backend:
+          serviceName: tea-svc
+          servicePort: 80
+        path: /tea
+      - backend:
+          serviceName: coffee-svc
+          servicePort: 80
+        path: /coffee
+```
+
